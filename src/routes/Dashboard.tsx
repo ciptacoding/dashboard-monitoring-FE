@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Search, Video, User } from 'lucide-react';
+import { LogOut, Search, Video, User, LayoutGrid, Map, Columns2 } from 'lucide-react';
 import { useAuth } from '@/state/useAuth';
 import { useCameras } from '@/state/useCameras';
 import { useLayoutPrefs } from '@/state/useLayoutPrefs';
@@ -41,7 +41,7 @@ export default function Dashboard() {
     setSelectedCameraIds,
     updateCameraStatus,
   } = useCameras();
-  const { loadPreferences } = useLayoutPrefs();
+  const { loadPreferences, splitRatio, setSplitRatio } = useLayoutPrefs();
   const { setConnected } = useWs();
 
   const [search, setSearch] = useState('');
@@ -218,8 +218,36 @@ export default function Dashboard() {
       </main>
 
       {/* Status bar */}
-      <footer className="h-12 border-t border-border bg-card/50 backdrop-blur flex items-center px-6">
+      <footer className="h-12 border-t border-border bg-card/50 backdrop-blur flex items-center justify-between px-6 relative z-[9999]">
         <WsIndicator />
+        
+        {/* Layout mode buttons */}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={splitRatio === 100 ? 'default' : 'ghost'}
+            onClick={() => setSplitRatio(100)}
+          >
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Grid Only
+          </Button>
+          <Button
+            size="sm"
+            variant={splitRatio === 50 ? 'default' : 'ghost'}
+            onClick={() => setSplitRatio(50)}
+          >
+            <Columns2 className="h-4 w-4 mr-2" />
+            50:50
+          </Button>
+          <Button
+            size="sm"
+            variant={splitRatio === 0 ? 'default' : 'ghost'}
+            onClick={() => setSplitRatio(0)}
+          >
+            <Map className="h-4 w-4 mr-2" />
+            Map Only
+          </Button>
+        </div>
       </footer>
 
       {/* Dialogs */}
