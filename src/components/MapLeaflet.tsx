@@ -132,6 +132,40 @@ const CameraPopup = ({ camera, onEdit, onShowInGrid }: {
   );
 };
 
+const MapContent = ({
+  cameras,
+  focusedCameraId,
+  onEditCamera,
+  onShowInGrid,
+}: Omit<MapLeafletProps, 'cameras'> & { cameras: Camera[] }) => {
+  return (
+    <>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      <MapController cameras={cameras} focusedCameraId={focusedCameraId} />
+
+      {cameras.map((camera) => (
+        <Marker
+          key={camera.id}
+          position={[camera.latitude, camera.longitude]}
+          icon={createCameraIcon(camera.status)}
+        >
+          <Popup maxWidth={400}>
+            <CameraPopup
+              camera={camera}
+              onEdit={onEditCamera}
+              onShowInGrid={onShowInGrid}
+            />
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
+};
+
 export const MapLeaflet = ({
   cameras,
   focusedCameraId,
@@ -146,28 +180,12 @@ export const MapLeaflet = ({
         className="h-full w-full"
         zoomControl={true}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        <MapContent
+          cameras={cameras}
+          focusedCameraId={focusedCameraId}
+          onEditCamera={onEditCamera}
+          onShowInGrid={onShowInGrid}
         />
-
-        <MapController cameras={cameras} focusedCameraId={focusedCameraId} />
-
-        {cameras.map((camera) => (
-          <Marker
-            key={camera.id}
-            position={[camera.latitude, camera.longitude]}
-            icon={createCameraIcon(camera.status)}
-          >
-            <Popup maxWidth={400}>
-              <CameraPopup
-                camera={camera}
-                onEdit={onEditCamera}
-                onShowInGrid={onShowInGrid}
-              />
-            </Popup>
-          </Marker>
-        ))}
       </MapContainer>
     </div>
   );
