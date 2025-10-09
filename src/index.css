@@ -138,19 +138,16 @@ All colors MUST be HSL.
     @apply w-full h-full object-cover;
   }
 
-  /* React Split gutter */
-  .gutter {
-    @apply bg-border hover:bg-primary/20;
-    background-repeat: no-repeat;
-    background-position: 50%;
-    transition: background-color 0.2s ease;
+  /* React Resizable Panels handle */
+  .resize-handle {
+    position: relative;
+    width: 8px;
+    background: hsl(var(--border));
   }
-
-  .gutter.gutter-horizontal {
-    cursor: col-resize;
+  .resize-handle:hover {
+    background: hsl(var(--primary) / 0.2);
   }
-
-  .gutter.gutter-horizontal::before {
+  .resize-handle::before {
     content: '';
     position: absolute;
     top: 50%;

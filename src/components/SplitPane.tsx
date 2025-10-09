@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { useLayoutPrefs } from '@/state/useLayoutPrefs';
 import { Button } from '@/components/ui/button';
 import { LayoutGrid, Map, Columns2 } from 'lucide-react';
-import Split from 'react-split';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 interface SplitPaneProps {
   leftPane: React.ReactNode;
@@ -11,9 +12,7 @@ interface SplitPaneProps {
 export const SplitPane = ({ leftPane, rightPane }: SplitPaneProps) => {
   const { splitRatio, setSplitRatio } = useLayoutPrefs();
 
-  const handleDrag = (sizes: number[]) => {
-    setSplitRatio(sizes[0]);
-  };
+  const sizes = useMemo(() => [splitRatio, 100 - splitRatio], [splitRatio]);
 
   return (
     <div className="relative h-full">
@@ -50,18 +49,17 @@ export const SplitPane = ({ leftPane, rightPane }: SplitPaneProps) => {
       ) : splitRatio === 0 ? (
         <div className="h-full">{rightPane}</div>
       ) : (
-        <Split
-          className="flex h-full"
-          sizes={[splitRatio, 100 - splitRatio]}
-          minSize={[300, 300]}
-          gutterSize={8}
-          onDragEnd={handleDrag}
-          cursor="col-resize"
-        >
-          <div className="h-full overflow-hidden">{leftPane}</div>
-          <div className="h-full overflow-hidden">{rightPane}</div>
-        </Split>
+        <PanelGroup direction="horizontal" className="h-full">
+          <Panel defaultSize={sizes[0]} minSize={20} className="overflow-hidden">
+            {leftPane}
+          </Panel>
+          <PanelResizeHandle className="resize-handle" />
+          <Panel defaultSize={sizes[1]} minSize={20} className="overflow-hidden">
+            {rightPane}
+          </Panel>
+        </PanelGroup>
       )}
     </div>
   );
 };
+
