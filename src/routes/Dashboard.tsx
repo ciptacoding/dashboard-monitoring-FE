@@ -14,7 +14,7 @@ import {
 } from '@/lib/notifications';
 import { Camera } from '@/types/camera';
 import { CameraGrid } from '@/components/CameraGrid';
-import { MapLeaflet } from '@/components/MapLeaflet';
+import { BasicLeafletMap } from '@/components/BasicLeafletMap';
 import { SplitPane } from '@/components/SplitPane';
 import { WsIndicator } from '@/components/WsIndicator';
 import { CameraCrudDialog } from '@/components/CameraCrudDialog';
@@ -202,7 +202,7 @@ export default function Dashboard() {
             />
           }
           rightPane={
-            <MapLeaflet
+            <BasicLeafletMap
               cameras={filteredCameras}
               focusedCameraId={focusedCameraId}
               onEditCamera={handleEditCamera}
