@@ -8,89 +8,48 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 13% 10%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 220 13% 13%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 13% 13%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 47 96% 53%;
+    --primary-foreground: 220 13% 10%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 47 96% 53%;
+    --accent-foreground: 220 13% 10%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 47 96% 53%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Status colors for monitoring */
+    --status-online: 142 71% 45%;
+    --status-offline: 0 72% 51%;
+    --status-unknown: 215 20% 65%;
+    --status-warning: 45 93% 47%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Camera pin */
+    --camera-pin: 47 96% 53%;
+    --camera-pin-glow: 47 96% 53%;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -101,5 +60,122 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Leaflet styles */
+  .leaflet-container {
+    @apply bg-secondary;
+  }
+
+  .leaflet-popup-content-wrapper {
+    @apply bg-card text-card-foreground rounded-lg shadow-lg;
+  }
+
+  .leaflet-popup-tip {
+    @apply bg-card;
+  }
+}
+
+@layer components {
+  /* Camera pin pulse animation */
+  .cam-pin {
+    @apply relative w-4 h-4 rounded-full border-2 border-white shadow-lg;
+    background-color: hsl(var(--camera-pin));
+    z-index: 1000;
+  }
+
+  .cam-pin::before {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ping;
+    background-color: hsl(var(--camera-pin-glow) / 0.6);
+    animation: pulse-spread 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .cam-pin.offline {
+    background-color: hsl(var(--status-offline));
+  }
+
+  .cam-pin.offline::before {
+    background-color: hsl(var(--status-offline) / 0.6);
+  }
+
+  /* Status indicators */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot.online {
+    background-color: hsl(var(--status-online));
+    box-shadow: 0 0 8px hsl(var(--status-online) / 0.5);
+  }
+
+  .status-dot.offline {
+    background-color: hsl(var(--status-offline));
+    box-shadow: 0 0 8px hsl(var(--status-offline) / 0.5);
+  }
+
+  .status-dot.unknown {
+    background-color: hsl(var(--status-unknown));
+  }
+
+  /* Grid cell styles */
+  .grid-cell {
+    @apply relative bg-card border border-border rounded-lg overflow-hidden;
+    transition: var(--transition-smooth);
+  }
+
+  .grid-cell:hover {
+    @apply border-primary;
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
+  }
+
+  /* Video container */
+  .video-container {
+    @apply relative w-full h-full bg-secondary/50;
+  }
+
+  .video-container video {
+    @apply w-full h-full object-cover;
+  }
+
+  /* React Split gutter */
+  .gutter {
+    @apply bg-border hover:bg-primary/20;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transition: background-color 0.2s ease;
+  }
+
+  .gutter.gutter-horizontal {
+    cursor: col-resize;
+  }
+
+  .gutter.gutter-horizontal::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 40px;
+    background: hsl(var(--muted-foreground));
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  @keyframes pulse-spread {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0.3;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
   }
 }
