@@ -12,9 +12,9 @@ export class WsClient {
   private url: string;
   private token: string;
 
-  constructor(url: string, token: string) {
+  constructor(url: string, token?: string) {
     this.url = url;
-    this.token = token;
+    this.token = token || '';
   }
 
   connect(onConnectionChange: (connected: boolean) => void) {
@@ -23,7 +23,12 @@ export class WsClient {
     }
 
     try {
-      this.ws = new WebSocket(`${this.url}?token=${this.token}`);
+      const sep = this.url.includes('?') ? '&' : '?';
+      const url = this.token
+      ? `${this.url}${sep}token=${encodeURIComponent(this.token)}`
+      : this.url;
+
+      this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');

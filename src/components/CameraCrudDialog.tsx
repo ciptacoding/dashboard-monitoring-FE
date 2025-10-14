@@ -73,10 +73,6 @@ export const CameraCrudDialog = ({
       newErrors.name = 'Name must be at least 3 characters';
     }
 
-    if (!formData.streamUrlHls || !formData.streamUrlHls.endsWith('.m3u8')) {
-      newErrors.streamUrlHls = 'Stream URL must be a valid .m3u8 file';
-    }
-
     if (
       formData.latitude === undefined ||
       formData.latitude < -90 ||

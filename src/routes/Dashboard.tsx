@@ -5,7 +5,7 @@ import { useAuth } from '@/state/useAuth';
 import { useCameras } from '@/state/useCameras';
 import { useLayoutPrefs } from '@/state/useLayoutPrefs';
 import { useWs } from '@/state/useWs';
-import { createMockWsClient } from '@/lib/wsClient';
+import { WsClient } from '@/lib/wsClient';
 import {
   requestNotificationPermission,
   registerServiceWorker,
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const {
     cameras,
     selectedCameraIds,
+    setCameras,
     addCamera,
     updateCamera,
     deleteCamera,
@@ -57,37 +59,44 @@ export default function Dashboard() {
     requestNotificationPermission();
   }, [loadPreferences]);
 
+  useEffect(() => {
+  let mounted = true;
+  (async () => {
+    try {
+        const list = await api.cameras.getAll();
+        if (!mounted) return;
+        setCameras(list);
+        setSelectedCameraIds(list.slice(0, 4).map(c => c.id)); // default grid
+      } catch (e) {
+        console.error('Failed to load cameras from API:', e);
+      }
+  })();
+    return () => { mounted = false; };
+  }, [setCameras, setSelectedCameraIds]);
+
   // WebSocket connection
   useEffect(() => {
-    const mockWs = createMockWsClient(
-      (connected) => setConnected(connected),
-      (event) => {
-        if (event.type === 'camera_status') {
-          updateCameraStatus(event.id, event.status, event.lastSeen);
-          
-          if (event.status === 'OFFLINE') {
-            const camera = cameras.find((c) => c.id === event.id);
-            if (camera) {
-              showCameraOfflineNotification(camera.name, camera.id);
-            }
-          }
-        } else if (event.type === 'camera_not_found') {
-          showCameraNotFoundNotification(event.id);
-        } else if (event.type === 'motion_detected') {
+    const ws = new WsClient((import.meta as any).env.VITE_WS_URL);
+    const off = ws.on((event) => {
+      if (event.type === 'camera_status') {
+        updateCameraStatus(event.id, event.status, event.lastSeen);
+        if (event.status === 'OFFLINE') {
           const camera = cameras.find((c) => c.id === event.id);
-          if (camera) {
-            toast.info('Motion Detected', {
-              description: `Motion detected at ${camera.name}`,
-            });
-          }
+          if (camera) showCameraOfflineNotification(camera.name, camera.id);
         }
+      } else if (event.type === 'camera_not_found') {
+        showCameraNotFoundNotification(event.id);
+      } else if (event.type === 'motion_detected') {
+        const camera = cameras.find((c) => c.id === event.id);
+        if (camera) toast.info('Motion Detected', { description: `Motion detected at ${camera.name}` });
       }
-    );
+    });
 
-    return () => {
-      mockWs.disconnect();
-    };
-  }, [cameras, setConnected, updateCameraStatus]);
+    ws.connect((connected) => setConnected(connected));
+    return () => { off(); ws.disconnect(); };
+    // penting: tambahkan dependency seperlunya
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setConnected, updateCameraStatus, cameras]);
 
   // Focus camera from notification
   useEffect(() => {
