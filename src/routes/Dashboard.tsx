@@ -63,10 +63,10 @@ export default function Dashboard() {
   let mounted = true;
   (async () => {
     try {
-        const list = await api.cameras.getAll();
+        const response = await api.cameras.getAll();
         if (!mounted) return;
-        setCameras(list);
-        setSelectedCameraIds(list.slice(0, 4).map(c => c.id)); // default grid
+        setCameras(response.data);
+        setSelectedCameraIds(response.data.slice(0, 4).map(c => c.id)); // default grid
       } catch (e) {
         console.error('Failed to load cameras from API:', e);
       }

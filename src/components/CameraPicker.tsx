@@ -113,11 +113,11 @@ export const CameraPicker = ({
               All
             </Badge>
             <Badge
-              variant={statusFilter === 'ONLINE' ? 'default' : 'outline'}
+              variant={statusFilter === 'READY' ? 'default' : 'outline'}
               className="cursor-pointer"
-              onClick={() => setStatusFilter('ONLINE')}
+              onClick={() => setStatusFilter('READY')}
             >
-              Online
+              Ready
             </Badge>
             <Badge
               variant={statusFilter === 'OFFLINE' ? 'default' : 'outline'}

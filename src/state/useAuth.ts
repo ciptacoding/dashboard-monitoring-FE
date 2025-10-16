@@ -1,10 +1,11 @@
 import { create } from 'zustand';
+import { authAPI } from '@/lib/api';
 
 interface AuthState {
-  user: { email: string } | null;
+  user: any | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, remember: boolean) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => void;
 }
@@ -14,29 +15,21 @@ export const useAuth = create<AuthState>((set) => ({
   token: null,
   isAuthenticated: false,
 
-  login: async (email: string, password: string, remember: boolean) => {
-    // Mock authentication - replace with real API call
-    if (email && password) {
-      const mockToken = `mock-jwt-${Date.now()}`;
-      
-      if (remember) {
-        localStorage.setItem('auth_token', mockToken);
-        localStorage.setItem('auth_user', JSON.stringify({ email }));
-      }
+  login: async (username: string, password: string) => {
+    const { token, user } = await authAPI.login({ username, password });
+    
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('auth_user', JSON.stringify(user));
 
-      set({
-        user: { email },
-        token: mockToken,
-        isAuthenticated: true,
-      });
-    } else {
-      throw new Error('Invalid credentials');
-    }
+    set({
+      user,
+      token,
+      isAuthenticated: true,
+    });
   },
 
   logout: () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    authAPI.logout();
     set({
       user: null,
       token: null,

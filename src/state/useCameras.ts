@@ -1,9 +1,13 @@
 import { create } from 'zustand';
 import { Camera } from '@/types/camera';
+import { cameraAPI } from '@/lib/api';
 
 interface CamerasState {
   cameras: Camera[];
   selectedCameraIds: string[];
+  loading: boolean;
+  error: string | null;
+  fetchCameras: () => Promise<void>;
   setCameras: (cameras: Camera[]) => void;
   addCamera: (camera: Camera) => void;
   updateCamera: (id: string, updates: Partial<Camera>) => void;
@@ -67,27 +71,45 @@ interface CamerasState {
 export const useCameras = create<CamerasState>((set) => ({
   cameras: [],
   selectedCameraIds: [],
+  loading: false,
+  error: null,
+  
+  fetchCameras: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await cameraAPI.getAll();
+      set({ cameras: response.data, loading: false });
+    } catch (error: any) {
+      set({ error: error.message, loading: false });
+    }
+  },
+  
   setCameras: (cameras) => set({ cameras }),
+  
   addCamera: (camera) =>
     set((state) => ({
       cameras: [...state.cameras, camera],
     })),
+    
   updateCamera: (id, updates) =>
     set((state) => ({
       cameras: state.cameras.map((cam) =>
         cam.id === id ? { ...cam, ...updates } : cam
       ),
     })),
+    
   deleteCamera: (id) =>
     set((state) => ({
       cameras: state.cameras.filter((cam) => cam.id !== id),
       selectedCameraIds: state.selectedCameraIds.filter((cid) => cid !== id),
     })),
+    
   setSelectedCameraIds: (ids) => set({ selectedCameraIds: ids }),
+  
   updateCameraStatus: (id, status, lastSeen) =>
     set((state) => ({
       cameras: state.cameras.map((cam) =>
-        cam.id === id ? { ...cam, status, lastSeen: lastSeen || cam.lastSeen } : cam
+        cam.id === id ? { ...cam, status, last_seen: lastSeen || cam.last_seen } : cam
       ),
     })),
 }));

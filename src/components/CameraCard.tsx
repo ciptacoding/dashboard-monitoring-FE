@@ -31,11 +31,11 @@ export const CameraCard = ({
   const [showPlayButton, setShowPlayButton] = useState(!autoPlay);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || !camera.hls_url) return;
 
     if (autoPlay) {
       playerRef.current = new HlsPlayer(videoRef.current);
-      playerRef.current.load(camera.streamUrlHls);
+      playerRef.current.load(camera.hls_url);
       setIsPlaying(true);
       setShowPlayButton(false);
     }
@@ -44,13 +44,13 @@ export const CameraCard = ({
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [camera.streamUrlHls, autoPlay]);
+  }, [camera.hls_url, autoPlay]);
 
   const handlePlay = () => {
-    if (!videoRef.current || playerRef.current) return;
+    if (!videoRef.current || playerRef.current || !camera.hls_url) return;
 
     playerRef.current = new HlsPlayer(videoRef.current);
-    playerRef.current.load(camera.streamUrlHls);
+    playerRef.current.load(camera.hls_url);
     setIsPlaying(true);
     setShowPlayButton(false);
   };
@@ -67,9 +67,9 @@ export const CameraCard = ({
           </div>
 
           <div className="video-container">
-            {camera.thumbnailUrl && !isPlaying && (
+            {camera.snapshot_url && !isPlaying && (
               <img
-                src={camera.thumbnailUrl}
+                src={camera.snapshot_url}
                 alt={camera.name}
                 className="absolute inset-0 w-full h-full object-cover"
               />

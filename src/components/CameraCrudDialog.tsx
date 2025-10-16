@@ -37,13 +37,17 @@ export const CameraCrudDialog = ({
 }: CameraCrudDialogProps) => {
   const [formData, setFormData] = useState<Partial<Camera>>({
     name: '',
-    streamUrlHls: '',
+    rtsp_url: '',
+    description: '',
     latitude: -0.973351,
     longitude: 116.708536,
     building: '',
     zone: '',
     tags: [],
     status: 'UNKNOWN',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -54,13 +58,17 @@ export const CameraCrudDialog = ({
     } else {
       setFormData({
         name: '',
-        streamUrlHls: '',
+        rtsp_url: '',
+        description: '',
         latitude: -0.973351,
         longitude: 116.708536,
         building: '',
         zone: '',
         tags: [],
         status: 'UNKNOWN',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
     setErrors({});
@@ -99,10 +107,16 @@ export const CameraCrudDialog = ({
     }
 
     if (camera) {
-      onSave({ ...camera, ...formData } as Camera);
+      onSave({ ...camera, ...formData, updated_at: new Date().toISOString() } as Camera);
       toast.success('Camera updated successfully');
     } else {
-      onSave({ ...formData, lastSeen: new Date().toISOString() } as Omit<Camera, 'id'>);
+      onSave({ 
+        ...formData, 
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_active: true,
+        status: 'UNKNOWN'
+      } as Omit<Camera, 'id'>);
       toast.success('Camera created successfully');
     }
 
@@ -148,19 +162,31 @@ export const CameraCrudDialog = ({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="streamUrl">
-              Stream URL (HLS) <span className="text-destructive">*</span>
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              placeholder="Camera description"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="rtspUrl">
+              RTSP URL <span className="text-destructive">*</span>
             </Label>
             <Input
-              id="streamUrl"
-              value={formData.streamUrlHls}
+              id="rtspUrl"
+              value={formData.rtsp_url}
               onChange={(e) =>
-                setFormData({ ...formData, streamUrlHls: e.target.value })
+                setFormData({ ...formData, rtsp_url: e.target.value })
               }
-              placeholder="https://example.com/stream.m3u8"
+              placeholder="rtsp://username:password@camera-ip:554/stream"
             />
-            {errors.streamUrlHls && (
-              <span className="text-sm text-destructive">{errors.streamUrlHls}</span>
+            {errors.rtsp_url && (
+              <span className="text-sm text-destructive">{errors.rtsp_url}</span>
             )}
           </div>
 
@@ -238,8 +264,9 @@ export const CameraCrudDialog = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ONLINE">Online</SelectItem>
+                <SelectItem value="READY">Ready</SelectItem>
                 <SelectItem value="OFFLINE">Offline</SelectItem>
+                <SelectItem value="ERROR">Error</SelectItem>
                 <SelectItem value="UNKNOWN">Unknown</SelectItem>
               </SelectContent>
             </Select>

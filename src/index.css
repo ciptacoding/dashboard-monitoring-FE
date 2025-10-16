@@ -104,7 +104,7 @@ All colors MUST be HSL.
     @apply w-2 h-2 rounded-full;
   }
 
-  .status-dot.online {
+  .status-dot.ready {
     background-color: hsl(var(--status-online));
     box-shadow: 0 0 8px hsl(var(--status-online) / 0.5);
   }
@@ -112,6 +112,11 @@ All colors MUST be HSL.
   .status-dot.offline {
     background-color: hsl(var(--status-offline));
     box-shadow: 0 0 8px hsl(var(--status-offline) / 0.5);
+  }
+
+  .status-dot.error {
+    background-color: hsl(var(--status-warning));
+    box-shadow: 0 0 8px hsl(var(--status-warning) / 0.5);
   }
 
   .status-dot.unknown {

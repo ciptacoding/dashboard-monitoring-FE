@@ -36,12 +36,12 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password, remember);
+      await login(email, password);
       toast.success('Login successful');
       const from = (location.state as any)?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
-    } catch (error) {
-      toast.error('Login failed. Please check your credentials.');
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

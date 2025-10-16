@@ -6,7 +6,7 @@ export const WsIndicator = () => {
   const { connected } = useWs();
   const { cameras } = useCameras();
 
-  const onlineCount = cameras.filter((c) => c.status === 'ONLINE').length;
+  const onlineCount = cameras.filter((c) => c.status === 'READY').length;
   const offlineCount = cameras.filter((c) => c.status === 'OFFLINE').length;
 
   return (

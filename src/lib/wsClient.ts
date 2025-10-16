@@ -1,4 +1,10 @@
-import { WsEvent } from '@/types/camera';
+import { CameraStatus } from '@/types/camera';
+
+export type WsEvent =
+  | { type: 'camera_status'; id: string; status: CameraStatus; lastSeen?: string }
+  | { type: 'camera_not_found'; id: string }
+  | { type: 'motion_detected'; id: string; ts: string }
+  | { type: 'ping' };
 
 type EventCallback = (event: WsEvent) => void;
 
@@ -129,7 +135,7 @@ export const createMockWsClient = (
   // Simulate random status updates
   const interval = setInterval(() => {
     const mockEvents: WsEvent[] = [
-      { type: 'camera_status', id: '3', status: 'ONLINE', lastSeen: new Date().toISOString() },
+      { type: 'camera_status', id: '3', status: 'READY', lastSeen: new Date().toISOString() },
       { type: 'camera_status', id: '1', status: 'OFFLINE', lastSeen: new Date().toISOString() },
       { type: 'motion_detected', id: '2', ts: new Date().toISOString() },
     ];
