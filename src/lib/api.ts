@@ -28,12 +28,24 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      window.location.href = '/login';
-      throw new Error('Unauthorized');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = "/login";
+      } 
+      throw new Error('Session expired. Please login again.')
     }
-    
-    const errorData = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+
+    try {
+      const errorData = await res.json();
+      const errorMessage =
+        errorData.error ||
+        errorData.message ||
+        errorData.data?.error ||
+        `HTTP ${res.status}: ${res.statusText}`;
+      
+      throw new Error(errorMessage);
+    } catch (parseError) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
   }
 
   return res.json();
