@@ -2,12 +2,27 @@ import { Camera, CreateCameraRequest, UpdateCameraRequest, ApiResponse, Paginate
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api/v1';
 
+// Custom error class untuk API errors
+export class ApiError extends Error {
+  code: string;
+  details?: string;
+  statusCode: number;
+
+  constructor(message: string, code: string, statusCode: number, details?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
 // Get auth token from localStorage
 const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
-// HTTP client with JWT authentication
+// HTTP client dengan JWT authentication dan proper error handling
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const headers: HeadersInit = {
@@ -15,50 +30,78 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     ...(token && { Authorization: `Bearer ${token}` }),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...headers,
-      ...init?.headers,
-    },
-  });
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        ...headers,
+        ...init?.headers,
+      },
+    });
 
-  if (!res.ok) {
-    if (res.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = "/login";
-      } 
-      throw new Error('Session expired. Please login again.')
+    // Parse response body
+    const data = await res.json();
+
+    if (!res.ok) {
+      // Handle error response dengan error code
+      const errorCode = data.error?.code || 'UNKNOWN_ERROR';
+      const errorMessage = data.error?.message || data.message || 'An error occurred';
+      const errorDetails = data.error?.details;
+
+      // Handle 401 Unauthorized
+      if (res.status === 401) {
+        // Cek apakah ini token expired atau invalid credentials
+        if (errorCode === 'TOKEN_EXPIRED' || errorCode === 'TOKEN_INVALID') {
+          // Clear auth data
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          
+          // Redirect ke login hanya jika bukan di halaman login
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
+        }
+        
+        throw new ApiError(errorMessage, errorCode, res.status, errorDetails);
+      }
+
+      // Throw ApiError dengan code untuk handling spesifik
+      throw new ApiError(errorMessage, errorCode, res.status, errorDetails);
     }
 
-    try {
-      const errorData = await res.json();
-      const errorMessage =
-        errorData.error ||
-        errorData.message ||
-        errorData.data?.error ||
-        `HTTP ${res.status}: ${res.statusText}`;
-      
-      throw new Error(errorMessage);
-    } catch (parseError) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return data;
+  } catch (error) {
+    // Re-throw ApiError
+    if (error instanceof ApiError) {
+      throw error;
     }
+
+    // Network error atau JSON parse error
+    throw new ApiError(
+      'Network error. Please check your connection.',
+      'NETWORK_ERROR',
+      0,
+      error instanceof Error ? error.message : undefined
+    );
   }
-
-  return res.json();
 }
 
 // Authentication API
 export const authAPI = {
   async login(credentials: { username: string; password: string }): Promise<{ token: string; user: any }> {
-    const response = await http<ApiResponse<{ token: string; user: any }>>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    return response.data;
+    try {
+      const response = await http<ApiResponse<{ token: string; user: any }>>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      });
+      return response.data;
+    } catch (error) {
+      // Re-throw dengan context yang lebih jelas
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Login failed', 'LOGIN_ERROR', 500);
+    }
   },
 
   async register(data: { username: string; password: string; email?: string }): Promise<{ token: string; user: any }> {

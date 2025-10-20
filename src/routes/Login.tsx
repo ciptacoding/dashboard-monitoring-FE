@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, XCircle } from 'lucide-react';
+import { ApiError } from '@/lib/api';
 import logo from '@/assets/images/logo-pantara.png';
+import { ErrorAlert } from '@/components/ErrorAlert';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,7 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -28,14 +30,32 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, location]);
 
+  const getErrorMessage = (error: ApiError): string => {
+    switch (error.code) {
+      case 'INVALID_CREDENTIALS':
+        return 'Username atau password salah. Silakan coba lagi.';
+      case 'USER_INACTIVE':
+        return 'Akun Anda tidak aktif. Hubungi administrator.';
+      case 'MISSING_FIELDS':
+        return 'Username dan password harus diisi.';
+      case 'NETWORK_ERROR':
+        return 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+      case 'TOKEN_EXPIRED':
+        return 'Sesi Anda telah berakhir. Silakan login kembali.';
+      default:
+        return error.message || 'Terjadi kesalahan. Silakan coba lagi.';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    // Client-side validation
     if (!username.trim() || !password.trim()) {
-      const msg = 'Please fill in all fields';
-      setError(msg);
-      toast.error(msg)
+      const errorMsg = 'Username dan password harus diisi';
+      setError({ message: errorMsg, code: 'MISSING_FIELDS' });
+      toast.error(errorMsg);
       return;
     }
 
@@ -43,14 +63,26 @@ export default function Login() {
 
     try {
       await login(username.trim(), password);
-      toast.success('Login successful');
+      toast.success('Login berhasil! Selamat datang 👋');
       const from = (location.state as any)?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('Login failed:', err);
-      const errorMessage = err.message || 'Login failed. Please check your credential.';
-      setError(errorMessage);
+      
+      let errorMessage = 'Login gagal. Silakan coba lagi.';
+      let errorCode = 'LOGIN_ERROR';
+
+      if (err instanceof ApiError) {
+        errorMessage = getErrorMessage(err);
+        errorCode = err.code;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError({ message: errorMessage, code: errorCode });
       toast.error(errorMessage);
+      
+      // Clear password field untuk security
       setPassword('');
     } finally {
       setLoading(false);
@@ -71,11 +103,25 @@ export default function Login() {
         </div>
 
          {/* Error Alert */}
-        {error && (
+        {/* {error && (
           <Alert variant="destructive" className="animate-in fade-in-50">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              <div className="font-medium">{error.message}</div>
+              {error.code && (
+                <div className="text-xs mt-1 opacity-80">
+                  Error Code: {error.code}
+                </div>
+              )}
+            </AlertDescription>
           </Alert>
+        )} */}
+
+        {error && (
+          <ErrorAlert 
+            error={error} 
+            onDismiss={() => setError(null)} 
+          />
         )}
 
         <form onSubmit={handleSubmit} className='space-y-6'>
@@ -96,9 +142,11 @@ export default function Login() {
                 required
                 autoComplete='username'
                 autoFocus
+                className={error?.code === 'INVALID_CREDENTIALS' ? 'border-destructive' : ''}
               />
             </div>
-            {/* password */}
+            
+            {/* Password */}
             <div className='space-y-2'>
               <Label htmlFor='password'>Password</Label>
               <Input 
@@ -113,6 +161,7 @@ export default function Login() {
                 disabled={loading}
                 required
                 autoComplete="current-password"
+                className={error?.code === 'INVALID_CREDENTIALS' ? 'border-destructive' : ''}
               />
             </div>
 

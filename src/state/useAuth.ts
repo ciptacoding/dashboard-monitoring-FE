@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authAPI } from '@/lib/api';
+import { authAPI, ApiError } from '@/lib/api';
 
 interface User {
   id: string;
@@ -15,9 +15,11 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: { message: string; code: string } | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  clearError: () => void;
 }
 
 export const useAuth = create<AuthState>()(
@@ -27,10 +29,14 @@ export const useAuth = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: true,
+      error: null,
 
       login: async (username: string, password: string) => {
+        set({ isLoading: true, error: null });
+        
         try {
-          const response = await authAPI.login({ username, password});
+          const response = await authAPI.login({ username, password });
+          
           localStorage.setItem('auth_token', response.token);
           localStorage.setItem('auth_user', JSON.stringify(response.user));
 
@@ -39,21 +45,35 @@ export const useAuth = create<AuthState>()(
             token: response.token,
             isAuthenticated: true,
             isLoading: false,
+            error: null,
           });
         } catch (error: any) {
+          // Clear
+          // Clear auth data on error
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
+
+          let errorMessage = 'Login failed';
+          let errorCode = 'LOGIN_ERROR';
+
+          if (error instanceof ApiError) {
+            errorMessage = error.message;
+            errorCode = error.code;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
 
           set({
             user: null,
             token: null,
             isAuthenticated: false,
             isLoading: false,
+            error: { message: errorMessage, code: errorCode },
           });
 
-          const errorMessage = error.message || 'Invalid username or password';
-          throw new Error(errorMessage);
-        }            
+          // Re-throw error agar bisa di-handle di component
+          throw error;
+        }
       },
 
       logout: () => {
@@ -63,6 +83,7 @@ export const useAuth = create<AuthState>()(
           token: null,
           isAuthenticated: false,
           isLoading: false,
+          error: null,
         });
       },
 
@@ -82,6 +103,8 @@ export const useAuth = create<AuthState>()(
 
         try {
           const storedUser = JSON.parse(userStr);
+          
+          // Verify token dengan backend
           const user = await authAPI.getCurrentUser();
 
           set({
@@ -89,19 +112,32 @@ export const useAuth = create<AuthState>()(
             user,
             isAuthenticated: true,
             isLoading: false,
+            error: null,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Auth verification failed:', error);
+          
+          // Clear auth data
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
+
+          let errorCode = 'AUTH_CHECK_FAILED';
+          if (error instanceof ApiError) {
+            errorCode = error.code;
+          }
 
           set({
             isAuthenticated: false,
             token: null,
             user: null,
             isLoading: false,
+            error: { message: 'Session verification failed', code: errorCode },
           });
         }
+      },
+
+      clearError: () => {
+        set({ error: null });
       },
     }),
     {
