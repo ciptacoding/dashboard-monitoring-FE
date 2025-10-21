@@ -17,7 +17,7 @@ interface AuthState {
   isLoading: boolean;
   error: { message: string; code: string } | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
 }
@@ -48,8 +48,6 @@ export const useAuth = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
-          // Clear
-          // Clear auth data on error
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
 
@@ -71,20 +69,31 @@ export const useAuth = create<AuthState>()(
             error: { message: errorMessage, code: errorCode },
           });
 
-          // Re-throw error agar bisa di-handle di component
           throw error;
         }
       },
 
-      logout: () => {
-        authAPI.logout();
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        });
+      logout: async () => {
+        set({ isLoading: true });
+        
+        try {
+          // Call backend logout endpoint to blacklist token
+          await authAPI.logout();
+        } catch (error) {
+          console.error('Backend logout failed:', error);
+          // Continue with local logout even if backend fails
+        } finally {
+          // Always clear local storage
+          authAPI.localLogout();
+          
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+          });
+        }
       },
 
       checkAuth: async () => {
@@ -122,8 +131,11 @@ export const useAuth = create<AuthState>()(
           localStorage.removeItem('auth_user');
 
           let errorCode = 'AUTH_CHECK_FAILED';
+          let errorMessage = 'Session verification failed';
+
           if (error instanceof ApiError) {
             errorCode = error.code;
+            errorMessage = error.message;
           }
 
           set({
@@ -131,7 +143,7 @@ export const useAuth = create<AuthState>()(
             token: null,
             user: null,
             isLoading: false,
-            error: { message: 'Session verification failed', code: errorCode },
+            error: { message: errorMessage, code: errorCode },
           });
         }
       },

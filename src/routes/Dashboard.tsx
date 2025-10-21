@@ -26,6 +26,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -60,17 +62,17 @@ export default function Dashboard() {
   }, [loadPreferences]);
 
   useEffect(() => {
-  let mounted = true;
-  (async () => {
-    try {
+    let mounted = true;
+    (async () => {
+      try {
         const response = await api.cameras.getAll();
         if (!mounted) return;
         setCameras(response.data);
-        setSelectedCameraIds(response.data.slice(0, 4).map(c => c.id)); // default grid
+        setSelectedCameraIds(response.data.slice(0, 4).map(c => c.id));
       } catch (e) {
         console.error('Failed to load cameras from API:', e);
       }
-  })();
+    })();
     return () => { mounted = false; };
   }, [setCameras, setSelectedCameraIds]);
 
@@ -94,7 +96,6 @@ export default function Dashboard() {
 
     ws.connect((connected) => setConnected(connected));
     return () => { off(); ws.disconnect(); };
-    // penting: tambahkan dependency seperlunya
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setConnected, updateCameraStatus, cameras]);
 
@@ -110,9 +111,18 @@ export default function Dashboard() {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      toast.loading('Logging out...');
+      await logout();
+      toast.dismiss();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Logout failed, but cleared local session');
+      navigate('/login');
+    }
   };
 
   const handleAddCamera = () => {
@@ -152,8 +162,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Top bar */}
-      <header className="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center justify-between px-6">
+      {/* Top bar - PENTING: tambahkan z-index tinggi dan relative */}
+      <header className="relative z-50 h-16 border-b border-border bg-card/50 backdrop-blur flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Video className="h-5 w-5 text-primary" />
@@ -177,17 +187,28 @@ export default function Dashboard() {
             />
           </div>
 
+          {/* User Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative">
                 <User className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled>
-                {user?.email || 'Admin'}
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled className="cursor-default">
+                <User className="h-4 w-4 mr-2" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{user?.username || 'User'}</span>
+                  <span className="text-xs text-muted-foreground">{user?.email || 'user@example.com'}</span>
+                </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout}>
+              <DropdownMenuItem disabled className="cursor-default">
+                <span className="text-xs text-muted-foreground">Role: {user?.role || 'N/A'}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </DropdownMenuItem>
@@ -197,7 +218,7 @@ export default function Dashboard() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative z-10">
         <SplitPane
           leftPane={
             <CameraGrid
@@ -227,7 +248,7 @@ export default function Dashboard() {
       </main>
 
       {/* Status bar */}
-      <footer className="h-12 border-t border-border bg-card/50 backdrop-blur flex items-center justify-between px-6 relative z-[9999]">
+      <footer className="relative z-40 h-12 border-t border-border bg-card/50 backdrop-blur flex items-center justify-between px-6">
         <WsIndicator />
         
         {/* Layout mode buttons */}

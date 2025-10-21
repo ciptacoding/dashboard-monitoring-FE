@@ -87,6 +87,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 // Authentication API
+// Authentication API
 export const authAPI = {
   async login(credentials: { username: string; password: string }): Promise<{ token: string; user: any }> {
     try {
@@ -96,7 +97,6 @@ export const authAPI = {
       });
       return response.data;
     } catch (error) {
-      // Re-throw dengan context yang lebih jelas
       if (error instanceof ApiError) {
         throw error;
       }
@@ -117,7 +117,20 @@ export const authAPI = {
     return response.data;
   },
 
-  logout() {
+  // NEW: Backend logout endpoint
+  async logout(): Promise<void> {
+    try {
+      await http<ApiResponse<void>>('/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      // Log error but don't throw - local cleanup still happens
+      console.error('Logout API call failed:', error);
+    }
+  },
+
+  // Local logout (clear storage)
+  localLogout() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
   },

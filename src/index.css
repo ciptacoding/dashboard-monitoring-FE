@@ -181,3 +181,21 @@ All colors MUST be HSL.
     }
   }
 }
+
+/* Fix Sheet/Dialog overlay z-index */
+[data-radix-dialog-overlay],
+[data-radix-sheet-overlay] {
+  z-index: 9998 !important;
+  background-color: hsl(var(--background) / 0.8);
+}
+
+[data-radix-dialog-content],
+[data-radix-sheet-content] {
+  z-index: 9999 !important;
+  background-color: hsl(var(--background));
+}
+
+/* Pastikan sheet content tidak transparent */
+.sheet-content {
+  background: hsl(var(--background)) !important;
+}
