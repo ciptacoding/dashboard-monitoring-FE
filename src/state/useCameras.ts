@@ -1,115 +1,152 @@
 import { create } from 'zustand';
 import { Camera } from '@/types/camera';
-import { cameraAPI } from '@/lib/api';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface CamerasState {
   cameras: Camera[];
   selectedCameraIds: string[];
   loading: boolean;
   error: string | null;
-  fetchCameras: () => Promise<void>;
+  
+  // Camera refresh tracking untuk handle frozen streams
+  cameraRefreshTimestamps: Record<string, number>;
+  
+  // Actions
   setCameras: (cameras: Camera[]) => void;
   addCamera: (camera: Camera) => void;
-  updateCamera: (id: string, updates: Partial<Camera>) => void;
+  updateCamera: (id: string, camera: Partial<Camera>) => void;
   deleteCamera: (id: string) => void;
   setSelectedCameraIds: (ids: string[]) => void;
-  updateCameraStatus: (id: string, status: Camera['status'], lastSeen?: string) => void;
+  updateCameraStatus: (id: string, status: string, lastSeen?: string) => void;
+  
+  // Auto-refresh actions
+  refreshCameraStream: (id: string) => Promise<void>;
+  markCameraForRefresh: (id: string) => void;
+  shouldRefreshCamera: (id: string) => boolean;
+  
+  // Loading states
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
 }
 
-// Mock initial cameras
-// const MOCK_CAMERAS: Camera[] = [
-//   {
-//     id: '1',
-//     name: 'Main Entrance',
-//     streamUrlHls: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-//     latitude: -0.973351,
-//     longitude: 116.708536,
-//     building: 'Building A',
-//     zone: 'Entrance',
-//     tags: ['entrance', 'main'],
-//     status: 'ONLINE',
-//     lastSeen: new Date().toISOString(),
-//   },
-//   {
-//     id: '2',
-//     name: 'Parking Area',
-//     streamUrlHls: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-//     latitude: -0.974351,
-//     longitude: 116.709536,
-//     building: 'Building A',
-//     zone: 'Parking',
-//     tags: ['parking', 'outdoor'],
-//     status: 'ONLINE',
-//     lastSeen: new Date().toISOString(),
-//   },
-//   {
-//     id: '3',
-//     name: 'Server Room',
-//     streamUrlHls: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-//     latitude: -0.972351,
-//     longitude: 116.707536,
-//     building: 'Building B',
-//     zone: 'Server',
-//     tags: ['critical', 'indoor'],
-//     status: 'OFFLINE',
-//     lastSeen: new Date(Date.now() - 3600000).toISOString(),
-//   },
-//   {
-//     id: '4',
-//     name: 'Lobby Camera',
-//     streamUrlHls: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-//     latitude: -0.975351,
-//     longitude: 116.710536,
-//     building: 'Building A',
-//     zone: 'Lobby',
-//     tags: ['lobby', 'main'],
-//     status: 'ONLINE',
-//     lastSeen: new Date().toISOString(),
-//   },
-// ];
-
-export const useCameras = create<CamerasState>((set) => ({
+export const useCameras = create<CamerasState>((set, get) => ({
   cameras: [],
   selectedCameraIds: [],
   loading: false,
   error: null,
-  
-  fetchCameras: async () => {
-    set({ loading: true, error: null });
-    try {
-      const response = await cameraAPI.getAll();
-      set({ cameras: response.data, loading: false });
-    } catch (error: any) {
-      set({ error: error.message, loading: false });
-    }
-  },
-  
-  setCameras: (cameras) => set({ cameras }),
-  
-  addCamera: (camera) =>
+  cameraRefreshTimestamps: {},
+
+  setCameras: (cameras) => set({ cameras, error: null }),
+
+  addCamera: (camera) => {
     set((state) => ({
       cameras: [...state.cameras, camera],
-    })),
-    
-  updateCamera: (id, updates) =>
+    }));
+  },
+
+  updateCamera: (id, updatedFields) => {
     set((state) => ({
       cameras: state.cameras.map((cam) =>
-        cam.id === id ? { ...cam, ...updates } : cam
+        cam.id === id ? { ...cam, ...updatedFields } : cam
       ),
-    })),
-    
-  deleteCamera: (id) =>
+    }));
+  },
+
+  deleteCamera: (id) => {
     set((state) => ({
       cameras: state.cameras.filter((cam) => cam.id !== id),
       selectedCameraIds: state.selectedCameraIds.filter((cid) => cid !== id),
-    })),
-    
+    }));
+  },
+
   setSelectedCameraIds: (ids) => set({ selectedCameraIds: ids }),
-  
-  updateCameraStatus: (id, status, lastSeen) =>
+
+  updateCameraStatus: (id, status, lastSeen) => {
     set((state) => ({
       cameras: state.cameras.map((cam) =>
-        cam.id === id ? { ...cam, status, last_seen: lastSeen || cam.last_seen } : cam
+        cam.id === id
+          ? {
+              ...cam,
+              status: status as any,
+              last_seen: lastSeen || cam.last_seen,
+            }
+          : cam
       ),
-    })),
+    }));
+  },
+
+  // Mark camera for refresh (to prevent too frequent refreshes)
+  markCameraForRefresh: (id) => {
+    set((state) => ({
+      cameraRefreshTimestamps: {
+        ...state.cameraRefreshTimestamps,
+        [id]: Date.now(),
+      },
+    }));
+  },
+
+  // Check if camera should be refreshed (not refreshed in last 10 seconds)
+  shouldRefreshCamera: (id) => {
+    const lastRefresh = get().cameraRefreshTimestamps[id] || 0;
+    const now = Date.now();
+    const minRefreshInterval = 10000; // 10 seconds
+    
+    return now - lastRefresh > minRefreshInterval;
+  },
+
+  // Refresh camera stream
+  refreshCameraStream: async (id) => {
+    const state = get();
+    const camera = state.cameras.find((c) => c.id === id);
+    
+    if (!camera) {
+      console.error('Camera not found:', id);
+      return;
+    }
+
+    // Check if we should refresh (rate limiting)
+    if (!state.shouldRefreshCamera(id)) {
+      console.log('Camera refresh rate limited:', id);
+      return;
+    }
+
+    try {
+      console.log('🔄 Refreshing camera stream:', camera.name);
+      
+      // Mark as refreshing
+      state.markCameraForRefresh(id);
+      
+      // Stop existing stream
+      try {
+        await api.cameras.stopStream(id);
+      } catch (error) {
+        console.warn('Error stopping stream (may already be stopped):', error);
+      }
+
+      // Wait a bit before restarting
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Start stream again
+      const updatedCamera = await api.cameras.startStream(id);
+      
+      // Update camera in state
+      state.updateCamera(id, updatedCamera);
+      
+      console.log('✅ Camera stream refreshed:', camera.name);
+      
+      toast.success('Stream Refreshed', {
+        description: `${camera.name} stream has been refreshed`,
+      });
+    } catch (error) {
+      console.error('Error refreshing camera stream:', error);
+      
+      toast.error('Refresh Failed', {
+        description: `Failed to refresh ${camera.name}. Will retry automatically.`,
+      });
+    }
+  },
+
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
 }));

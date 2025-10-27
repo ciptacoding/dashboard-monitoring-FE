@@ -5,7 +5,7 @@ import { useAuth } from '@/state/useAuth';
 import { useCameras } from '@/state/useCameras';
 import { useLayoutPrefs } from '@/state/useLayoutPrefs';
 import { useWs } from '@/state/useWs';
-import { WsClient } from '@/lib/wsClient';
+import { WsClient, WSEvent, CameraStatusEvent, StreamUpdateEvent } from '@/lib/wsClient';
 import {
   requestNotificationPermission,
   registerServiceWorker,
@@ -44,6 +44,7 @@ export default function Dashboard() {
     deleteCamera,
     setSelectedCameraIds,
     updateCameraStatus,
+    refreshCameraStream,
   } = useCameras();
   const { loadPreferences, splitRatio, setSplitRatio } = useLayoutPrefs();
   const { setConnected } = useWs();
@@ -61,6 +62,7 @@ export default function Dashboard() {
     requestNotificationPermission();
   }, [loadPreferences]);
 
+  // Load cameras from API
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -76,28 +78,140 @@ export default function Dashboard() {
     return () => { mounted = false; };
   }, [setCameras, setSelectedCameraIds]);
 
-  // WebSocket connection
+  // WebSocket connection with enhanced event handling
   useEffect(() => {
-    const ws = new WsClient((import.meta as any).env.VITE_WS_URL);
-    const off = ws.on((event) => {
-      if (event.type === 'camera_status') {
-        updateCameraStatus(event.id, event.status, event.lastSeen);
-        if (event.status === 'OFFLINE') {
-          const camera = cameras.find((c) => c.id === event.id);
-          if (camera) showCameraOfflineNotification(camera.name, camera.id);
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
+    console.log('Connecting to WebSocket:', wsUrl);
+    
+    const ws = new WsClient(wsUrl);
+    
+    const unsubscribe = ws.on((event: WSEvent) => {
+      console.log('📨 Received WebSocket event:', event.type);
+      
+      switch (event.type) {
+        case 'connected':
+          console.log('✅ WebSocket connected:', event.data);
+          toast.success('Connected', {
+            description: 'Real-time monitoring active',
+          });
+          break;
+
+        case 'camera_status': {
+          const statusData = event.data as CameraStatusEvent;
+          console.log('📹 Camera status update:', statusData);
+          
+          updateCameraStatus(statusData.id, statusData.status, statusData.last_seen);
+          
+          // Show notification if camera goes offline
+          if (statusData.status === 'OFFLINE') {
+            const camera = cameras.find((c) => c.id === statusData.id);
+            if (camera) {
+              showCameraOfflineNotification(camera.name, camera.id);
+              
+              toast.error('Camera Offline', {
+                description: `${camera.name} is offline`,
+              });
+            }
+          }
+          
+          // Show notification if camera comes back online
+          if (statusData.status === 'ONLINE') {
+            const camera = cameras.find((c) => c.id === statusData.id);
+            if (camera) {
+              toast.success('Camera Online', {
+                description: `${camera.name} is back online`,
+              });
+            }
+          }
+          break;
         }
-      } else if (event.type === 'camera_not_found') {
-        showCameraNotFoundNotification(event.id);
-      } else if (event.type === 'motion_detected') {
-        const camera = cameras.find((c) => c.id === event.id);
-        if (camera) toast.info('Motion Detected', { description: `Motion detected at ${camera.name}` });
+
+        case 'stream_update': {
+          const streamData = event.data as StreamUpdateEvent;
+          console.log('🎥 Stream update:', streamData);
+          
+          const camera = cameras.find((c) => c.id === streamData.id);
+          if (!camera) break;
+
+          switch (streamData.status) {
+            case 'frozen':
+              toast.warning('Stream Frozen', {
+                description: `${streamData.name}: ${streamData.message}`,
+                duration: 5000,
+              });
+              
+              // Auto-refresh frozen stream
+              console.log('🔄 Auto-refreshing frozen stream:', streamData.name);
+              refreshCameraStream(streamData.id);
+              break;
+
+            case 'offline':
+              toast.error('Camera Offline', {
+                description: `${streamData.name}: ${streamData.message}`,
+                duration: 5000,
+              });
+              break;
+
+            case 'online':
+              toast.success('Camera Online', {
+                description: `${streamData.name}: ${streamData.message}`,
+              });
+              break;
+
+            case 'restarted':
+              toast.success('Stream Restarted', {
+                description: `${streamData.name}: ${streamData.message}`,
+              });
+              
+              // Force refresh the camera in UI
+              setTimeout(() => {
+                // Trigger a re-render by updating the camera
+                updateCamera(streamData.id, { 
+                  status: 'ONLINE',
+                  last_seen: new Date().toISOString(),
+                });
+              }, 1000);
+              break;
+
+            case 'restart_failed':
+              toast.error('Restart Failed', {
+                description: `${streamData.name}: ${streamData.message}`,
+                duration: 8000,
+              });
+              break;
+          }
+          break;
+        }
+
+        case 'pong':
+          // Heartbeat response - no action needed
+          break;
+
+        case 'error':
+          console.error('WebSocket error event:', event.data);
+          toast.error('Connection Error', {
+            description: 'WebSocket connection issue',
+          });
+          break;
       }
     });
 
-    ws.connect((connected) => setConnected(connected));
-    return () => { off(); ws.disconnect(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setConnected, updateCameraStatus, cameras]);
+    ws.connect((connected) => {
+      console.log('WebSocket connection status:', connected);
+      setConnected(connected);
+      
+      if (!connected) {
+        toast.error('Disconnected', {
+          description: 'Real-time monitoring inactive. Reconnecting...',
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      ws.disconnect();
+    };
+  }, [setConnected, updateCameraStatus, cameras, updateCamera, refreshCameraStream]);
 
   // Focus camera from notification
   useEffect(() => {
@@ -162,7 +276,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Top bar - PENTING: tambahkan z-index tinggi dan relative */}
+      {/* Top bar */}
       <header className="relative z-50 h-16 border-b border-border bg-card/50 backdrop-blur flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
