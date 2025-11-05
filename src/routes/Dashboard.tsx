@@ -62,21 +62,44 @@ export default function Dashboard() {
     requestNotificationPermission();
   }, [loadPreferences]);
 
-  // Load cameras from API
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const response = await api.cameras.getAll();
+useEffect(() => {
+  let mounted = true;
+  
+  (async () => {
+    try {
+      const allCameras: Camera[] = [];
+      const pageSize = 50; // atau 25, 10, tergantung API limit
+      let currentPage = 1;
+      let hasMore = true;
+
+      // Loop untuk mengambil semua kamera sampai total 50
+      while (hasMore && allCameras.length < 50) {
+        const response = await api.cameras.getAll({
+          page: currentPage,
+          page_size: pageSize
+        });
+        
         if (!mounted) return;
-        setCameras(response.data);
-        setSelectedCameraIds(response.data.slice(0, 4).map(c => c.id));
-      } catch (e) {
-        console.error('Failed to load cameras from API:', e);
+
+        allCameras.push(...response.data);
+        
+        // Cek apakah masih ada data berikutnya
+        hasMore = response.data.length === pageSize && allCameras.length < 50;
+        currentPage++;
       }
-    })();
-    return () => { mounted = false; };
-  }, [setCameras, setSelectedCameraIds]);
+
+      // Ambil maksimal 50 kamera
+      const cameras = allCameras.slice(0, 50);
+      setCameras(cameras);
+      setSelectedCameraIds(cameras.slice(0, 4).map(c => c.id));
+      
+    } catch (e) {
+      console.error('Failed to load cameras from API:', e);
+    }
+  })();
+
+  return () => { mounted = false; };
+}, [setCameras, setSelectedCameraIds]);
 
   // WebSocket connection with enhanced event handling
   useEffect(() => {
