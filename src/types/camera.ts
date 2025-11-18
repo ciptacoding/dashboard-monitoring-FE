@@ -1,4 +1,4 @@
-export type CameraStatus = 'READY' | 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
+export type CameraStatus = 'READY' | 'ONLINE' | 'OFFLINE' | 'ERROR' | 'FROZEN' | 'UNKNOWN';
 
 export interface Camera {
   id: string;
@@ -24,6 +24,7 @@ export interface Camera {
   // Metadata
   tags?: string[];
   status: CameraStatus;
+  status_message?: string; // Status message from backend
   last_seen?: string;
   is_active: boolean;
   
@@ -36,6 +37,18 @@ export interface Camera {
   created_by?: string;
   created_at: string;
   updated_at: string;
+}
+
+// Camera Preview interface for preview endpoint
+export interface CameraPreview {
+  id: string;
+  name: string;
+  status: CameraStatus;
+  status_message?: string;
+  hls_url?: string;
+  snapshot_url?: string;
+  has_stream: boolean;
+  last_seen?: string;
 }
 
 export interface CreateCameraRequest {
@@ -72,6 +85,11 @@ export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: string;
+  };
 }
 
 export interface PaginatedResponse<T> {

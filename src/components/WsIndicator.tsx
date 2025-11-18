@@ -28,12 +28,12 @@ export const WsIndicator = () => {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <div className="status-dot online" />
-          <span className="text-muted-foreground">{onlineCount} Online</span>
+          <span className="text-muted-foreground">{onlineCount} Camera</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        {/* <div className="flex items-center gap-1.5">
           <div className="status-dot offline" />
           <span className="text-muted-foreground">{offlineCount} Offline</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );

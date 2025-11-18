@@ -22,6 +22,7 @@ interface CameraGridProps {
   onEditCamera: (camera: Camera) => void;
   onDeleteCamera: (camera: Camera) => void;
   onFocusCameraOnMap: (camera: Camera) => void;
+  onCameraStatusChange?: (cameraId: string, status: Camera['status']) => void;
 }
 
 export const CameraGrid = ({
@@ -32,6 +33,7 @@ export const CameraGrid = ({
   onEditCamera,
   onDeleteCamera,
   onFocusCameraOnMap,
+  onCameraStatusChange,
 }: CameraGridProps) => {
   const { gridLayout, autoPlayPreview, setGridLayout, setAutoPlayPreview } =
     useLayoutPrefs();
@@ -47,10 +49,10 @@ export const CameraGrid = ({
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 p-4 border-b border-border bg-card/50">
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <Grid2x2 className="h-5 w-5 text-primary" />
           <span className="font-semibold">Camera Grid</span>
-        </div>
+        </div> */}
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -120,6 +122,7 @@ export const CameraGrid = ({
                 onEdit={onEditCamera}
                 onDelete={onDeleteCamera}
                 onFocusOnMap={onFocusCameraOnMap}
+                onStatusChange={onCameraStatusChange}
               />
             );
           })}

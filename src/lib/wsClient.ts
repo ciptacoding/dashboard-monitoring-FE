@@ -15,6 +15,7 @@ export interface CameraStatusEvent {
   id: string;
   status: string;
   last_seen?: string;
+  status_message?: string;
 }
 
 export interface StreamUpdateEvent {

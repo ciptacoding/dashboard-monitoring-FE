@@ -1,11 +1,13 @@
-// src/components/CameraCard.tsx - With Auto-Recovery
+// src/components/CameraCard.tsx - With Auto-Recovery and Lazy Loading
 
 import { useEffect, useRef, useState } from 'react';
 import { Play, MoreVertical, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Camera } from '@/types/camera';
 import { HlsPlayer } from '@/lib/hlsPlayer';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -19,6 +21,7 @@ interface CameraCardProps {
   onEdit: (camera: Camera) => void;
   onDelete: (camera: Camera) => void;
   onFocusOnMap: (camera: Camera) => void;
+  onStatusChange?: (cameraId: string, status: Camera['status']) => void;
 }
 
 export const CameraCard = ({
@@ -27,8 +30,10 @@ export const CameraCard = ({
   onEdit,
   onDelete,
   onFocusOnMap,
+  onStatusChange,
 }: CameraCardProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HlsPlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayButton, setShowPlayButton] = useState(!autoPlay);
@@ -36,6 +41,7 @@ export const CameraCard = ({
   const [isRecovering, setIsRecovering] = useState(false);
   const [recoveryCount, setRecoveryCount] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   const startStream = (url: string) => {
     if (!videoRef.current) return;
@@ -65,6 +71,35 @@ export const CameraCard = ({
         setHasError(true);
         setIsLoading(false);
         setIsRecovering(false);
+        
+        // If error indicates timeout or fatal error, mark camera as offline
+        if (error.includes('timeout') || error.includes('offline') || error.includes('fatal')) {
+          console.log('🔴 Marking camera as OFFLINE due to stream error:', error);
+          
+          // Determine error type for reporting
+          let errorType: 'timeout' | 'hls_error' | 'network_error' | 'decode_error' | 'other' = 'other';
+          if (error.includes('timeout')) {
+            errorType = 'timeout';
+          } else if (error.includes('HLS') || error.includes('hls')) {
+            errorType = 'hls_error';
+          } else if (error.includes('network') || error.includes('Network')) {
+            errorType = 'network_error';
+          } else if (error.includes('decode') || error.includes('media')) {
+            errorType = 'decode_error';
+          }
+          
+          // Report error to backend
+          api.cameras.reportStreamError(camera.id, errorType, error)
+            .then(() => {
+              console.log('✅ Stream error reported to backend');
+            })
+            .catch((err) => {
+              console.error('Failed to report stream error:', err);
+            });
+          
+          // Update camera status to OFFLINE
+          onStatusChange?.(camera.id, 'OFFLINE');
+        }
       };
 
       // Load the stream
@@ -97,11 +132,26 @@ export const CameraCard = ({
       video.addEventListener('waiting', handleWaiting);
       video.addEventListener('stalled', handleStalled);
 
-      // Timeout fallback
+      // Timeout fallback - if loading takes too long, mark as offline
       const timeout = setTimeout(() => {
         if (isLoading) {
-          console.warn('⏱️ Loading timeout, forcing recovery...');
-          playerRef.current?.forceReload();
+          console.warn('⏱️ Loading timeout after 15 seconds, marking as offline');
+          setHasError(true);
+          setIsLoading(false);
+          setIsRecovering(false);
+          
+          // Report timeout error to backend
+          api.cameras.reportStreamError(camera.id, 'timeout', 'HLS stream loading timeout after 15 seconds')
+            .then(() => {
+              console.log('✅ Timeout error reported to backend');
+            })
+            .catch((err) => {
+              console.error('Failed to report timeout error:', err);
+            });
+          
+          onStatusChange?.(camera.id, 'OFFLINE');
+          playerRef.current?.destroy();
+          playerRef.current = null;
         }
       }, 15000);
 
@@ -119,13 +169,51 @@ export const CameraCard = ({
     }
   };
 
+  // Intersection Observer for lazy loading
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsVisible(entry.isIntersecting);
+        });
+      },
+      {
+        rootMargin: '50px', // Start loading 50px before visible
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     if (!camera.hls_url) {
       setHasError(true);
       return;
     }
 
-    if (autoPlay) {
+    // Only start stream if visible and autoPlay is enabled
+    if (autoPlay && isVisible) {
+      // If player exists and URL changed (e.g., after backend restart), reload
+      if (playerRef.current) {
+        const currentUrl = playerRef.current.getCurrentUrl();
+        if (currentUrl && currentUrl !== camera.hls_url) {
+          console.log('🔄 HLS URL changed, reloading stream...', {
+            old: currentUrl,
+            new: camera.hls_url,
+          });
+          playerRef.current.destroy();
+          playerRef.current = null;
+        }
+      }
+      
+      // Start or restart stream
       const cleanup = startStream(camera.hls_url);
       setShowPlayButton(false);
 
@@ -134,13 +222,19 @@ export const CameraCard = ({
         playerRef.current?.destroy();
         playerRef.current = null;
       };
+    } else if (autoPlay && !isVisible && playerRef.current) {
+      // Stop stream if not visible to save resources
+      playerRef.current.destroy();
+      playerRef.current = null;
+      setIsPlaying(false);
+      setShowPlayButton(true);
     }
 
     return () => {
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [camera.hls_url, autoPlay]);
+  }, [camera.hls_url, autoPlay, isVisible]);
 
   const handlePlay = () => {
     if (!videoRef.current || playerRef.current || !camera.hls_url) return;
@@ -163,43 +257,89 @@ export const CameraCard = ({
     startStream(camera.hls_url);
   };
 
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="grid-cell group relative">
-          {/* Header with recovery indicator */}
-          <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-2 py-1 rounded">
-              <div className={`status-dot ${camera.status.toLowerCase()}`} />
-              <span className="text-xs font-medium">{camera.name}</span>
-              
-              {/* Recovery indicator */}
-              {isRecovering && (
-                <Badge variant="outline" className="text-xs gap-1 animate-pulse">
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  Recovering
-                </Badge>
-              )}
-              
-              {/* Recovery count (if > 0) */}
-              {recoveryCount > 0 && !isRecovering && (
-                <Badge variant="secondary" className="text-xs">
-                  ↻ {recoveryCount}
-                </Badge>
-              )}
-            </div>
+  const getStatusLabel = (status: Camera['status']): string => {
+    switch (status) {
+      case 'READY': return 'Ready';
+      case 'ONLINE': return 'Online';
+      case 'OFFLINE': return 'Offline';
+      case 'ERROR': return 'Error';
+      case 'UNKNOWN': return 'Unknown';
+      default: return status;
+    }
+  };
 
-            {/* Manual reload button (visible on hover) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-              onClick={handleManualReload}
-              title="Reload stream"
-            >
-              <RefreshCw className="h-3 w-3" />
-            </Button>
-          </div>
+  const getStatusDescription = (status: Camera['status']): string => {
+    // Use status_message from backend if available, otherwise use default description
+    if (camera.status_message) {
+      return camera.status_message;
+    }
+    
+    switch (status) {
+      case 'READY': return 'Kamera siap dan streaming aktif';
+      case 'ONLINE': return 'Kamera online dan berfungsi normal';
+      case 'OFFLINE': return 'Kamera offline atau tidak terhubung';
+      case 'ERROR': return 'Kamera mengalami error';
+      case 'FROZEN': return 'Stream kamera frozen';
+      case 'UNKNOWN': return 'Status kamera tidak diketahui';
+      default: return 'Status tidak valid';
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div ref={containerRef} className="grid-cell group relative">
+            {/* Header with recovery indicator */}
+            <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between">
+              <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-2 py-1 rounded">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-help">
+                      <div className={`status-dot ${camera.status.toLowerCase()}`} />
+                      <span className="text-xs font-medium">{camera.name}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="font-medium">{getStatusLabel(camera.status)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getStatusDescription(camera.status)}
+                    </p>
+                    {camera.last_seen && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Terakhir terlihat: {new Date(camera.last_seen).toLocaleString('id-ID')}
+                      </p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              
+                {/* Recovery indicator */}
+                {isRecovering && (
+                  <Badge variant="outline" className="text-xs gap-1 animate-pulse">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Recovering
+                  </Badge>
+                )}
+              
+                {/* Recovery count (if > 0) */}
+                {recoveryCount > 0 && !isRecovering && (
+                  <Badge variant="secondary" className="text-xs">
+                    ↻ {recoveryCount}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Manual reload button (visible on hover) */}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                onClick={handleManualReload}
+                title="Reload stream"
+              >
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+            </div>
 
           <div className="video-container">
             {/* Snapshot background */}
@@ -301,5 +441,6 @@ export const CameraCard = ({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+    </TooltipProvider>
   );
 };

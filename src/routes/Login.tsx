@@ -96,9 +96,9 @@ export default function Login() {
           <div className='flex justify-center mb-0'>
             <img src={logo} alt="Logo" className="w-24" />
           </div>
-          <h1 className="text-3xl font-bold">PANTARA</h1>
+          <h1 className="text-3xl font-bold">Dashboard CCTV</h1>
           <p className="text-muted-foreground mt-2">
-            Dashboard CCTV Berbasis <i>Geographic Information System</i>
+            Berbasis <i>Geographic Information System</i>
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function Login() {
           </Button>
 
           {/* Helper Text */}
-          <div className="text-center space-y-2">
+          {/* <div className="text-center space-y-2">
             <p className="text-xs text-muted-foreground">
               Default test credentials:
             </p>
@@ -209,7 +209,7 @@ export default function Login() {
                 <span className="font-semibold">admin123</span>
               </p>
             </div>
-          </div>
+          </div> */}
         </form>
       </div>
     </div>

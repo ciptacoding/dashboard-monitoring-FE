@@ -19,6 +19,7 @@ import { SplitPane } from '@/components/SplitPane';
 import { WsIndicator } from '@/components/WsIndicator';
 import { CameraCrudDialog } from '@/components/CameraCrudDialog';
 import { CameraPicker } from '@/components/CameraPicker';
+import { CameraStatusSummary } from '@/components/CameraStatusSummary';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -123,7 +124,7 @@ useEffect(() => {
           const statusData = event.data as CameraStatusEvent;
           console.log('📹 Camera status update:', statusData);
           
-          updateCameraStatus(statusData.id, statusData.status, statusData.last_seen);
+          updateCameraStatus(statusData.id, statusData.status, statusData.last_seen, statusData.status_message);
           
           // Show notification if camera goes offline
           if (statusData.status === 'OFFLINE') {
@@ -163,9 +164,15 @@ useEffect(() => {
                 duration: 5000,
               });
               
-              // Auto-refresh frozen stream
-              console.log('🔄 Auto-refreshing frozen stream:', streamData.name);
-              refreshCameraStream(streamData.id);
+              // Backend will handle restart with exponential backoff
+              // Frontend just needs to update status and let backend do the work
+              console.log('🧊 Stream frozen detected, backend will handle restart:', streamData.name);
+              
+              // Update camera status to indicate frozen (but don't refresh yet)
+              updateCamera(streamData.id, { 
+                status: 'FROZEN', // Update to FROZEN status
+                status_message: streamData.message,
+              });
               break;
 
             case 'offline':
@@ -173,27 +180,59 @@ useEffect(() => {
                 description: `${streamData.name}: ${streamData.message}`,
                 duration: 5000,
               });
+              
+              // Update camera status with status_message from backend
+              updateCamera(streamData.id, { 
+                status: 'OFFLINE',
+                status_message: streamData.message,
+              });
               break;
 
             case 'online':
               toast.success('Camera Online', {
                 description: `${streamData.name}: ${streamData.message}`,
               });
+              
+              // Update camera status with status_message from backend
+              updateCamera(streamData.id, { 
+                status: 'ONLINE',
+                status_message: streamData.message,
+                last_seen: new Date().toISOString(),
+              });
               break;
 
             case 'restarted':
               toast.success('Stream Restarted', {
                 description: `${streamData.name}: ${streamData.message}`,
+                duration: 3000,
               });
               
-              // Force refresh the camera in UI
-              setTimeout(() => {
-                // Trigger a re-render by updating the camera
-                updateCamera(streamData.id, { 
-                  status: 'ONLINE',
-                  last_seen: new Date().toISOString(),
+              // Backend has restarted the stream with new stream ID and HLS URL
+              // Fetch updated camera data to get new HLS URL
+              console.log('✅ Stream restarted by backend, fetching updated camera data...');
+              
+              // Fetch fresh camera data to get new HLS URL
+              api.cameras.getById(streamData.id)
+                .then((updatedCamera) => {
+                  // Update camera with new stream data including status_message
+                  updateCamera(streamData.id, {
+                    ...updatedCamera,
+                    status: 'ONLINE',
+                    status_message: streamData.message || updatedCamera.status_message,
+                    last_seen: new Date().toISOString(),
+                  });
+                  
+                  console.log('✓ Camera data updated with new stream URL');
+                })
+                .catch((error) => {
+                  console.error('Error fetching updated camera data:', error);
+                  // Fallback: just update status with message
+                  updateCamera(streamData.id, { 
+                    status: 'ONLINE',
+                    status_message: streamData.message,
+                    last_seen: new Date().toISOString(),
+                  });
                 });
-              }, 1000);
               break;
 
             case 'restart_failed':
@@ -201,6 +240,10 @@ useEffect(() => {
                 description: `${streamData.name}: ${streamData.message}`,
                 duration: 8000,
               });
+              
+              // Backend will retry with exponential backoff
+              // Frontend just needs to show the error
+              console.log('❌ Stream restart failed, backend will retry:', streamData.name);
               break;
           }
           break;
@@ -306,7 +349,7 @@ useEffect(() => {
             <Video className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold">CCTV Dashboard</h1>
+            <h1 className="text-lg font-bold">Dashboard CCTV GIS</h1>
             <p className="text-xs text-muted-foreground">
               Monitoring System
             </p>
@@ -366,6 +409,9 @@ useEffect(() => {
               onEditCamera={handleEditCamera}
               onDeleteCamera={(cam) => handleDeleteCamera(cam.id)}
               onFocusCameraOnMap={handleFocusCameraOnMap}
+              onCameraStatusChange={(cameraId, status) => {
+                updateCameraStatus(cameraId, status, new Date().toISOString());
+              }}
             />
           }
           rightPane={
@@ -387,6 +433,9 @@ useEffect(() => {
       {/* Status bar */}
       <footer className="relative z-40 h-12 border-t border-border bg-card/50 backdrop-blur flex items-center justify-between px-6">
         <WsIndicator />
+        
+        {/* Camera Status Summary */}
+        <CameraStatusSummary cameras={filteredCameras} />
         
         {/* Layout mode buttons */}
         <div className="flex gap-2">

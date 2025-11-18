@@ -109,6 +109,11 @@ All colors MUST be HSL.
     box-shadow: 0 0 8px hsl(var(--status-online) / 0.5);
   }
 
+  .status-dot.online {
+    background-color: hsl(var(--status-online));
+    box-shadow: 0 0 8px hsl(var(--status-online) / 0.5);
+  }
+
   .status-dot.offline {
     background-color: hsl(var(--status-offline));
     box-shadow: 0 0 8px hsl(var(--status-offline) / 0.5);
@@ -121,6 +126,12 @@ All colors MUST be HSL.
 
   .status-dot.unknown {
     background-color: hsl(var(--status-unknown));
+  }
+
+  .status-dot.frozen {
+    background-color: hsl(var(--status-warning));
+    box-shadow: 0 0 8px hsl(var(--status-warning) / 0.5);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   /* Grid cell styles */

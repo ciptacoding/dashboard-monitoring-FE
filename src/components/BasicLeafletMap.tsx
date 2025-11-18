@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L, { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
 import { Camera } from '@/types/camera';
+import { api } from '@/lib/api';
 import { renderToString } from 'react-dom/server';
 import 'leaflet/dist/leaflet.css';
 
@@ -74,21 +75,69 @@ export const BasicLeafletMap = ({ cameras, focusedCameraId, onEditCamera, onShow
 
         marker.bindPopup(() => {
           const div = L.DomUtil.create('div', 'w-72');
+          
+          // Get status label and description
+          const getStatusLabel = (status: string) => {
+            switch (status) {
+              case 'READY': return 'Ready';
+              case 'ONLINE': return 'Online';
+              case 'OFFLINE': return 'Offline';
+              case 'ERROR': return 'Error';
+              case 'UNKNOWN': return 'Unknown';
+              default: return status;
+            }
+          };
+          
+          const getStatusDescription = (status: string) => {
+            switch (status) {
+              case 'READY': return 'Kamera siap dan streaming aktif';
+              case 'ONLINE': return 'Kamera online dan berfungsi normal';
+              case 'OFFLINE': return 'Kamera offline atau tidak terhubung';
+              case 'ERROR': return 'Kamera mengalami error';
+              case 'UNKNOWN': return 'Status kamera tidak diketahui';
+              default: return 'Status tidak valid';
+            }
+          };
+          
+          const statusLabel = getStatusLabel(camera.status);
+          const statusDescription = getStatusDescription(camera.status);
+          const statusMessage = camera.status_message || statusDescription;
+          const lastSeen = camera.last_seen 
+            ? new Date(camera.last_seen).toLocaleString('id-ID', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Tidak diketahui';
+          
           div.innerHTML = `
-            <div class="mb-2">
-              <h3 class="font-semibold text-base">${camera.name}</h3>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="status-dot ${camera.status.toLowerCase()}"></span>
-                <span class="text-sm text-muted-foreground">${camera.status}</span>
+            <div class="mb-3">
+              <h3 class="font-semibold text-base mb-2">${camera.name}</h3>
+              <div class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <span class="status-dot ${camera.status.toLowerCase()}"></span>
+                  <div class="flex-1">
+                    <div class="text-sm font-medium">${statusLabel}</div>
+                    <div class="text-xs text-muted-foreground">${statusMessage}</div>
+                  </div>
+                </div>
+                ${camera.last_seen ? `
+                  <div class="text-xs text-muted-foreground">
+                    <span class="font-medium">Terakhir terlihat:</span> ${lastSeen}
+                  </div>
+                ` : ''}
               </div>
             </div>
-            <div class="space-y-1 text-sm mb-3">
-              ${camera.building ? `<div><span class="text-muted-foreground">Building:</span> ${camera.building}</div>` : ''}
-              ${camera.zone ? `<div><span class="text-muted-foreground">Zone:</span> ${camera.zone}</div>` : ''}
+            <div class="space-y-1 text-sm mb-3 pt-2 border-t border-border">
+              ${camera.building ? `<div><span class="text-muted-foreground font-medium">Building:</span> <span class="text-foreground">${camera.building}</span></div>` : ''}
+              ${camera.zone ? `<div><span class="text-muted-foreground font-medium">Zone:</span> <span class="text-foreground">${camera.zone}</span></div>` : ''}
+              ${camera.description ? `<div class="mt-2 text-xs text-muted-foreground">${camera.description}</div>` : ''}
             </div>
             <div class="flex gap-2">
-              <button id="show-${camera.id}" class="flex-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded">Show in Grid</button>
-              <button id="edit-${camera.id}" class="flex-1 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded">Edit</button>
+              <button id="show-${camera.id}" class="flex-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors">Show in Grid</button>
+              <button id="edit-${camera.id}" class="flex-1 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition-colors">Edit</button>
             </div>
           `;
           setTimeout(() => {

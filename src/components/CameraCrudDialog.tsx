@@ -388,13 +388,15 @@ export const CameraCrudDialog = ({
                 }
                 disabled={loading}
               >
-                <SelectTrigger>
-                  <SelectValue />
+                <SelectTrigger id="status" className="w-full">
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="READY">Online (Ready)</SelectItem>
+                  <SelectItem value="READY">Ready</SelectItem>
+                  <SelectItem value="ONLINE">Online</SelectItem>
                   <SelectItem value="OFFLINE">Offline</SelectItem>
                   <SelectItem value="ERROR">Error</SelectItem>
+                  <SelectItem value="FROZEN">Frozen</SelectItem>
                   <SelectItem value="UNKNOWN">Unknown</SelectItem>
                 </SelectContent>
               </Select>
